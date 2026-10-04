@@ -1,0 +1,11 @@
+node_modules/
+infra/cdk.out/
+infra/outputs.json
+.deployment/
+*.log
+.DS_Store
+Thumbs.db
+.vscode/
+.env
+.env.*
+!.env.example

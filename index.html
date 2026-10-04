@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f6f4ef">
+    <meta name="background-color" content="#f6f4ef">
+    <meta name="description" content="A practical, personal itinerary for a Perth work trip and confirmed flights, 10–24 October 2026.">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Perth Planner">
+    <title>Perth Trip Planner</title>
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" href="perth-trip-planner.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" sizes="180x180" href="perth-icon-180.png">
+    <link rel="stylesheet" href="styles.css">
+    <script src="data.js" defer></script>
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to itinerary</a>
+    <header class="topbar">
+      <a class="wordmark" href="#top" aria-label="Perth trip planner home"><span class="wordmark-mark">P</span><span>PERTH TRIP PLANNER</span></a>
+      <nav class="top-nav" aria-label="Page sections">
+        <a href="#itinerary">Itinerary</a>
+        <a href="#flights">Flights</a>
+        <a href="#stay">Trip essentials</a>
+        <a href="#weekend">Weekend</a>
+        <a href="#essentials">Essentials</a>
+      </nav>
+      <a class="top-date" href="#today"><span class="live-dot"></span> 10–24 OCT 2026</a>
+    </header>
+
+    <main id="main">
+      <section class="today-section section-shell" id="today" aria-labelledby="today-title">
+        <div class="section-heading">
+          <div><p class="eyebrow">YOUR POCKET BRIEFING</p><h2 id="today-title">Today, in a glance</h2></div>
+          <label class="date-control">Jump to a date <input id="today-date" type="date"></label>
+        </div>
+        <div id="today-content" class="today-grid" aria-live="polite"></div>
+        <section class="selected-day-panel" aria-labelledby="selected-day-title">
+          <div class="selected-day-heading">
+            <div><p class="eyebrow">PLANNED + ACTUAL</p><h3 id="selected-day-title">Full day</h3></div>
+            <div class="selected-day-heading-actions"><button type="button" class="secondary-button" id="restore-planned">Restore planned itinerary</button><button type="button" class="primary-button" id="change-tonight">Change tonight</button></div>
+          </div>
+          <p class="plan-storage-note">Planned events stay recoverable. Actual changes are saved only on this device.</p>
+          <div id="today-events" class="selected-day-events" aria-live="polite"></div>
+          <div class="quick-plan-actions" aria-label="Quick plan changes">
+            <button type="button" data-add-event="dinner">Add dinner</button>
+            <button type="button" data-edit-dinner>Change dinner</button>
+            <button type="button" data-add-event="shopping">Add shopping</button>
+            <button type="button" data-add-event="activity">Add activity</button>
+            <button type="button" data-add-event="free">Add free time</button>
+            <button type="button" data-add-event="custom">Custom plan</button>
+          </div>
+        </section>
+      </section>
+
+      <section class="flights-section section-shell" id="flights" aria-labelledby="flights-title">
+        <div class="section-heading">
+          <div><p class="eyebrow">CONFIRMED / SINGAPORE AIRLINES</p><h2 id="flights-title">Flights</h2></div>
+          <p class="section-note">Flight details are fixed. Only the surrounding plans are adjustable.</p>
+        </div>
+        <div id="flight-journeys" class="flight-journeys"></div>
+      </section>
+
+      <section class="weekend-section" id="weekend" aria-labelledby="weekend-title">
+        <div class="section-shell weekend-inner">
+          <div class="section-heading weekend-heading">
+            <div><p class="eyebrow">16–18 OCTOBER / YOUR CALL</p><h2 id="weekend-title">Three ways to spend the weekend.</h2></div>
+            <p class="section-note">Nothing is selected. Preview a plan to see its matching Thursday, Friday, and weekend schedule.</p>
+          </div>
+          <div id="option-selector" class="option-grid"></div>
+          <div id="option-detail" class="option-detail" aria-live="polite"></div>
+          <div id="tour-comparison" class="tour-comparison"></div>
+          <div id="weekend-day-detail" class="weekend-day-detail"></div>
+        </div>
+      </section>
+
+      <section class="stay-strip section-shell" id="stay" aria-label="Trip essentials"></section>
+
+      <section class="hero" id="top" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="eyebrow"><span>WESTERN AUSTRALIA</span><span class="eyebrow-rule"></span><span>01 / 01</span></p>
+          <h1 id="hero-title">Perth,<br><em>at your pace.</em></h1>
+          <p class="hero-lede">A little work. A lot of river air.<br>Your Perth field guide, 10–24 October 2026.</p>
+          <a class="hero-cta" href="#today">See the day <span aria-hidden="true">↓</span></a>
+        </div>
+        <div class="hero-image" role="img" aria-label="Ocean meeting the coastline in Western Australia">
+          <div class="image-caption"><span>THE WEST COAST</span><span>31° 57′ S / 115° 51′ E</span></div>
+          <div class="hero-image-label">INDIAN<br>OCEAN</div>
+        </div>
+        <div class="hero-bottom"><span>SOLO WORK TRIP</span><span>WALK · TRAIN · FERRY · UBER</span><span>PERTH, WA</span></div>
+      </section>
+
+      <section class="itinerary-section section-shell" id="itinerary" aria-labelledby="itinerary-title">
+        <div class="section-heading itinerary-heading">
+          <div><p class="eyebrow">15 DAYS / INCLUDING FLIGHT DAYS</p><h2 id="itinerary-title">The day-by-day</h2></div>
+          <p class="section-note">Work is the anchor. The rest can breathe.</p>
+        </div>
+        <div class="filter-wrap" role="group" aria-label="Filter itinerary">
+          <button class="filter-button is-active" data-filter="all" aria-pressed="true">All days</button>
+          <button class="filter-button" data-filter="workdays" aria-pressed="false">Workdays</button>
+          <button class="filter-button" data-filter="evenings" aria-pressed="false">Evenings</button>
+          <button class="filter-button" data-filter="weekend" aria-pressed="false">Weekend</button>
+          <span class="filter-divider" aria-hidden="true"></span>
+          <button class="filter-button option-filter" data-filter="option1" aria-pressed="false">Option 1</button>
+          <button class="filter-button option-filter" data-filter="option2" aria-pressed="false">Option 2</button>
+          <button class="filter-button option-filter" data-filter="option3" aria-pressed="false">Option 3</button>
+        </div>
+        <div id="timeline" class="timeline"></div>
+      </section>
+
+      <section class="essentials-section section-shell" id="essentials" aria-labelledby="essentials-title">
+        <div class="section-heading">
+          <div><p class="eyebrow">THE USEFUL BITS</p><h2 id="essentials-title">Before you head out</h2></div>
+          <p class="section-note">Checklists and a light-touch budget, saved on this device.</p>
+        </div>
+        <div class="essentials-grid">
+          <div id="checklists" class="checklist-columns"></div>
+          <section class="budget-panel" aria-labelledby="budget-title">
+            <div class="panel-heading"><div><p class="eyebrow">OPTIONAL / EDIT AS YOU GO</p><h3 id="budget-title">Trip budget</h3></div><span class="save-note">Saved on this device</span></div>
+            <div id="budget-table"></div>
+            <p class="budget-footnote">Amounts are in AUD. Indicative Southwest tour prices are references only; verify current inclusions and pricing before booking.</p>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <dialog class="plan-editor" id="plan-editor" aria-labelledby="plan-editor-title">
+      <form id="plan-form">
+        <div class="plan-editor-heading"><div><p class="eyebrow">ACTUAL PLAN / THIS DEVICE</p><h2 id="plan-editor-title">Change tonight</h2></div><button class="dialog-close" type="button" id="cancel-plan" aria-label="Close editor">×</button></div>
+        <input type="hidden" id="plan-event-id">
+        <input type="hidden" id="plan-entry-mode">
+        <div class="plan-form-grid">
+          <label class="form-wide" for="plan-title">Activity<input id="plan-title" name="title" required maxlength="100"></label>
+          <label for="plan-start">Start time<input id="plan-start" name="start" type="text" placeholder="e.g. 7:00 PM" required></label>
+          <label for="plan-end">End time (optional)<input id="plan-end" name="end" type="text" placeholder="e.g. 8:30 PM"></label>
+          <label for="plan-type">Type<select id="plan-type" name="type"><option value="activity">Activity</option><option value="food">Food</option><option value="shopping">Shopping</option><option value="free">Free time</option><option value="travel">Travel</option><option value="hotel">Hotel</option></select></label>
+          <label class="form-wide" for="plan-notes">Notes (optional)<textarea id="plan-notes" name="notes" rows="3" maxlength="240"></textarea></label>
+        </div>
+        <div class="plan-editor-actions"><button type="button" class="secondary-button" id="cancel-plan-bottom">Cancel</button><button type="submit" class="primary-button">Save actual plan</button></div>
+      </form>
+    </dialog>
+
+    <footer class="footer"><a class="wordmark footer-mark" href="#top"><span class="wordmark-mark">P</span><span>PERTH TRIP PLANNER</span></a><span class="planner-updated">Trip planner updated: <time datetime="2026-10-04">4 October 2026</time><span id="offline-status" role="status">Offline setup pending</span></span><a href="#top">Back to top ↑</a></footer>
+  </body>
+</html>
