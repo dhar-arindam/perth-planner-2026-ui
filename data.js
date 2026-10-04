@@ -59,7 +59,7 @@ window.TRIP = {
   restaurants: [
     { name: 'Argyle Bar & Restaurant', query: 'Argyle Bar & Restaurant Elizabeth Quay Perth' },
     { name: 'Six Senses The Quay', query: 'Six Senses The Quay Elizabeth Quay Perth' },
-    { name: 'The Island at Elizabeth Quay', query: 'The Island Elizabeth Quay Perth', url: 'https://www.theislandeq.com.au/' },
+    { name: 'The Island at Elizabeth Quay', query: 'The Island Elizabeth Quay Perth' },
     { name: '6HEAD Perth', query: '6HEAD Perth Elizabeth Quay' },
     { name: 'The Lucky Shag', query: 'The Lucky Shag Perth Elizabeth Quay' }
   ],

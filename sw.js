@@ -1,4 +1,4 @@
-const CACHE_NAME = 'perth-trip-planner-v3';
+const CACHE_NAME = 'perth-trip-planner-v4';
 const APP_SHELL = [
   './',
   './index.html',
