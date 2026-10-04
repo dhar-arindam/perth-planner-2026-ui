@@ -40,6 +40,7 @@ jobs:
           chrome-version: latest
           install-dependencies: true
       - name: Test PWA and offline behavior
+        timeout-minutes: 2
         env:
           PWA_BROWSER: ${{ steps.chromium.outputs.chrome-path }}
         run: node scripts/check-pwa.cjs

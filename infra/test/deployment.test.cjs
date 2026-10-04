@@ -3,6 +3,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { test } = require('node:test');
 const { spawnSync } = require('node:child_process');
+const vm = require('node:vm');
+const { EventEmitter } = require('node:events');
 const cdk = require('aws-cdk-lib');
 const { Template, Match } = require('aws-cdk-lib/assertions');
 const YAML = require('yaml');
@@ -23,6 +25,36 @@ test('CDK refuses an implicit region when no CLI/environment region is configure
   });
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /Select an AWS region/);
+});
+
+test('PWA browser startup signal failure reports promptly without hanging in cleanup', { timeout: 5000 }, async () => {
+  const messages = [];
+  const fakeProcess = { env: { PWA_BROWSER: process.execPath }, exitCode: 0 };
+  const child = new EventEmitter();
+  child.stderr = new EventEmitter();
+  child.exitCode = null;
+  child.signalCode = null;
+  child.kill = () => { throw new Error('Already-exited browser must not be killed or awaited'); };
+  const source = fs.readFileSync(path.resolve(__dirname, '../../scripts/check-pwa.cjs'), 'utf8');
+  await vm.runInNewContext(source, {
+    __dirname: path.resolve(__dirname, '../../scripts'),
+    process: fakeProcess,
+    require: (name) => name === 'node:child_process' ? {
+      spawn: () => {
+        setImmediate(() => {
+          child.stderr.emit('data', Buffer.from('Simulated Linux browser startup failure'));
+          child.signalCode = 'SIGTRAP';
+          child.emit('exit', null, 'SIGTRAP');
+        });
+        return child;
+      }
+    } : require(name),
+    setTimeout, clearTimeout,
+    console: { error: (message) => messages.push(message), log() {} }
+  });
+  assert.equal(fakeProcess.exitCode, 1);
+  assert.match(messages.join('\n'), /Browser exited before startup \(SIGTRAP\)/);
+  assert.match(messages.join('\n'), /Simulated Linux browser startup failure/);
 });
 
 test('private versioned encrypted bucket and CloudFront OAC; no website or custom DNS', () => {

@@ -47,12 +47,20 @@ async function main() {
     browser = spawn(browserPath, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--no-first-run', '--no-default-browser-check', 'about:blank']);
     const endpoint = await new Promise((resolve, reject) => {
       let stderr = '';
-      const timer = setTimeout(() => reject(new Error('Browser startup timed out')), 20000);
-      browser.on('error', reject);
+      const failed = (error) => { cleanup(); reject(error); };
+      const exited = (code, signal) => failed(new Error(`Browser exited before startup (${signal || code}): ${stderr.slice(-2000)}`));
+      const timer = setTimeout(() => failed(new Error(`Browser startup timed out: ${stderr.slice(-2000)}`)), 20000);
+      const cleanup = () => {
+        clearTimeout(timer);
+        browser.removeListener('error', failed);
+        browser.removeListener('exit', exited);
+      };
+      browser.once('error', failed);
+      browser.once('exit', exited);
       browser.stderr.on('data', (chunk) => {
         stderr += chunk.toString();
         const match = stderr.match(/DevTools listening on (ws:\/\/[^\s]+)/);
-        if (match) { clearTimeout(timer); resolve(match[1]); }
+        if (match) { cleanup(); resolve(match[1]); }
       });
     });
     socket = new WebSocket(endpoint);
@@ -192,7 +200,11 @@ async function main() {
     console.log('PASS: 320/375/390/430px with all options, external-link cues, offline fonts, no console errors');
   } finally {
     socket?.close();
-    if (browser && browser.exitCode === null) { browser.kill(); await new Promise((resolve) => browser.once('exit', resolve)); }
+    if (browser && browser.exitCode === null && browser.signalCode === null) {
+      const exited = new Promise((resolve) => browser.once('exit', resolve));
+      browser.kill();
+      await exited;
+    }
     await new Promise((resolve) => server.close(resolve));
     try { fs.rmSync(profile, { recursive: true, force: true }); } catch {}
   }
