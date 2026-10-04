@@ -3,7 +3,6 @@
 Perth Trip Planner is a dependency-free static application for 10-24 October 2026.
 There is no backend, API, package installation, bundler, or production build step.
 The HTML, CSS, JavaScript, manifest, and bundled assets are the production files.
-The separate `infra/` directory uses npm/CDK for infrastructure only, not the application.
 
 ## Deployment And Installation
 
@@ -75,197 +74,98 @@ registration pending, so the independent browser check is the offline gate.
 
 ## Deployment
 
-### Architecture
+There is **one environment: production**. The static application has no build,
+dependency installation, infrastructure framework, or promotion pipeline.
 
-`GitHub main -> Actions validation -> GitHub OIDC -> deployment role -> private S3 -> CloudFront OAC -> https://<generated>.cloudfront.net`
+`GitHub main -> Actions -> GitHub OIDC -> dedicated role -> private S3 -> CloudFront OAC -> generated CloudFront URL`
 
-The CDK stack is `PerthPlannerProduction`. It creates one dedicated, private S3
-bucket (public access blocked, owner-enforced, encrypted, versioned, retained), one
-CloudFront distribution and OAC, a distribution-scoped read bucket policy, and a
-least-privilege GitHub deployment role. An account-level GitHub OIDC provider is
-created only when no existing provider ARN is supplied. New providers are retained.
-There is no website endpoint, custom domain, Route 53, ACM certificate, API, or SPA
-error-page fallback. Viewer HTTP requests redirect to HTTPS; the default root is
-`index.html`.
+### One-Time Hosting And OIDC
 
-The role trusts only `repo:dhar-arindam/perth-planner-2026-ui:ref:refs/heads/main`
-with audience `sts.amazonaws.com`. It can list/get location for its bucket,
-put/delete its objects, and create/read invalidations for its distribution. It
-cannot provision infrastructure. Local CDK bootstrap/deployment uses your own
-short-lived AWS login, not GitHub OIDC. Never put AWS access keys in GitHub.
+Create/configure hosting manually once through AWS Console/CLI. Exact commands,
+policy templates, and safety notes are in [docs/aws-setup.md](docs/aws-setup.md).
+The existing foundation already meets the target; **do not create another bucket,
+distribution, provider, or role**. Removing CDK source does not remove the existing
+AWS resources. Do not delete their legacy CloudFormation/ bootstrap stacks.
 
-### Safe Local Checks (No AWS Resources Created)
+S3 must remain private, encrypted, versioned, and public-access-blocked, without
+website hosting. CloudFront uses its S3 origin via OAC, `index.html` as the default
+root, HTTPS, and no aliases or SPA fallback. No custom domain, Route 53, or custom
+ACM certificate is needed.
 
-Prerequisites: Node.js 24 LTS, npm, Git, AWS CLI v2, and Chromium/Edge for tests.
-From the repository root, in PowerShell:
+GitHub uses short-lived OIDC credentials. The dedicated role trusts only
+`repo:dhar-arindam/perth-planner-2026-ui:ref:refs/heads/main` and audience
+`sts.amazonaws.com`. It can list/upload/delete this bucket's objects and
+create/read invalidations for this distribution; it cannot create infrastructure.
+The existing role ARN is a non-secret literal in the workflow. Do not add AWS keys
+or GitHub environment-specific configuration.
+
+### Four GitHub Repository Variables
+
+Settings > Secrets and variables > Actions > Variables:
+
+| Variable | Existing production value |
+| --- | --- |
+| `AWS_REGION` | `ap-south-1` |
+| `S3_BUCKET_NAME` | `perthplannerproduction-sitebucket397a1860-wzqmjci6w9tn` |
+| `CLOUDFRONT_DISTRIBUTION_ID` | `EV423THGIU6DJ` |
+| `CLOUDFRONT_URL` | `https://d1wqegzix5mr72.cloudfront.net` |
+
+The former `AWS_ROLE_ARN` variable is no longer used and may be removed from
+GitHub. The actual dedicated IAM role is still required and must not be deleted.
+
+### Automated Application Deployment
+
+The workflow `.github/workflows/deploy.yml` validates JavaScript, workflow YAML,
+plain policy templates, packaging, and offline/PWA behavior with Node.js 24 and
+Chromium. It requires no npm install, CDK, synthesis, or application build.
+PRs to `main` validate only, without an AWS token. Pushes to `main` and manual
+dispatch on `main` deploy the validated artifact. Non-main dispatch cannot deploy.
+
+`node scripts/package-site.cjs` copies only an explicit production allowlist into
+ignored `.deployment/`, preserving paths and including fonts/photos/icons and
+licenses. Git metadata, policy templates, docs, tests, editor files, and development
+tooling are excluded. `deployment.json` records the commit and file hashes without
+changing the planner. The package is an upload artifact, not a build system.
+
+After OIDC authentication, `node scripts/deploy-site.cjs` syncs to the dedicated
+bucket with obsolete-key deletion. It publishes assets first and the worker last,
+uses revalidation headers for current unhashed files, and sets the manifest MIME
+type explicitly. Then it submits `/*` invalidation, waits for completion, checks
+S3 inventory, and verifies HTTP 200 and exact release hashes through CloudFront.
+Deployment is serialized, stops on errors, and is not atomic across S3 objects;
+rerun a failed upload to recover. No AWS infrastructure is created by Actions.
+
+### Redeploy, Verify, And Roll Back
+
+Manual redeploy: Actions > Validate and Deploy Perth Planner > Run workflow >
+select `main`. Wait for the actual run to succeed, open the CloudFront URL, confirm
+offline readiness, and test a normal offline reload. Installed clients retain
+their existing worker until planner windows close, as described under Updates.
+
+For exact verification, download the successful run's `production-site-<commit>`
+artifact into `.deployment/`; Windows line endings can make a regenerated package
+different. Then run:
 
 ```powershell
-npm ci --prefix infra
+$env:CLOUDFRONT_URL = 'https://d1wqegzix5mr72.cloudfront.net'
+node scripts/verify-deployment.cjs
+```
+
+Rollback with a reviewed revert commit on `main`, preserving deployment tooling.
+For changed PWA files, use a new worker `CACHE_NAME` and update the footer date.
+Push the rollback commit through the same validation/upload/invalidation checks.
+S3 version history is a recovery aid, not the normal release path.
+
+Safe local checks (no AWS resources created or uploads performed):
+
+```powershell
 node --check app.js
 node --check data.js
 node --check sw.js
 node scripts/check-pwa.cjs
-npm test --prefix infra
+node --test scripts/deployment.test.cjs
 node scripts/package-site.cjs
 ```
 
-The browser test defaults to Windows Edge. Set `$env:PWA_BROWSER` to a different
-Chromium executable if needed. CI installs Chromium and sets this variable.
-`npm ci` installs infrastructure/test dependencies only. The current pinned CDK
-release bundles a `brace-expansion` dependency with a high-severity npm advisory;
-`npm audit fix` cannot independently replace that bundled dependency. It is not
-deployed to S3 or used by the app; update CDK when an upstream fix is available.
-
-For an offline synthesis check with an explicitly artificial account:
-
-```powershell
-$env:CDK_DEFAULT_ACCOUNT = '111111111111'
-$previousRegion = $env:AWS_REGION
-$env:AWS_REGION = 'ap-south-1' # inspected CLI region; validation only
-Push-Location infra
-npx cdk synth --no-lookups
-Pop-Location
-Remove-Item Env:CDK_DEFAULT_ACCOUNT
-$env:AWS_REGION = $previousRegion
-```
-
-Never use the artificial account for bootstrap/deployment. This creates only
-local, ignored `infra/cdk.out/` files. There is no application compile/build step.
-
-### One-Time AWS Setup (Creates Resources)
-
-Do not run these commands until ready to create production infrastructure.
-Authenticate in your own terminal (`aws login`, or your organization's SSO login),
-select the intended AWS profile, and confirm its account. Do not share credentials.
-The inspected default region is `ap-south-1`; the commands use your configured
-region, rather than silently deploying to a default.
-
-```powershell
-if (-not $env:AWS_REGION) { $env:AWS_REGION = $env:AWS_DEFAULT_REGION }
-if (-not $env:AWS_REGION) { $env:AWS_REGION = aws configure get region }
-if (-not $env:AWS_REGION) { throw 'Select an AWS region before deployment.' }
-$account = aws sts get-caller-identity --query Account --output text
-if ($LASTEXITCODE -ne 0) { throw 'Refresh your AWS login before continuing.' }
-$account = $account.Trim()
-Write-Output "Target account: $account; region: $env:AWS_REGION"
-
-$providerArn = "arn:aws:iam::${account}:oidc-provider/token.actions.githubusercontent.com"
-$providerList = aws iam list-open-id-connect-providers --output json
-if ($LASTEXITCODE -ne 0) { throw 'OIDC provider inspection failed; do not assume it is absent.' }
-$providers = ($providerList | ConvertFrom-Json).OpenIDConnectProviderList.Arn
-$oidcContext = @()
-if ($providers -contains $providerArn) {
-	$oidcContext = @('-c', "existingGitHubOidcProviderArn=$providerArn")
-	aws iam get-open-id-connect-provider --open-id-connect-provider-arn $providerArn
-	# Confirm URL is token.actions.githubusercontent.com and ClientIDList includes sts.amazonaws.com.
-}
-
-Push-Location infra
-npx cdk bootstrap "aws://$account/$env:AWS_REGION" @oidcContext
-if ($LASTEXITCODE -ne 0) { throw 'CDK bootstrap failed.' }
-npx cdk deploy PerthPlannerProduction @oidcContext --outputs-file outputs.json
-if ($LASTEXITCODE -ne 0) { throw 'CDK deployment failed.' }
-Pop-Location
-```
-
-Bootstrap creates standard CDK support resources. Deployment creates the described
-production stack; review IAM changes when CDK asks for approval. No application
-files are uploaded by CDK. Keep the same OIDC create/import context on subsequent
-stack updates. When importing, confirm the provider belongs to this account and
-supports the required audience; do not replace an existing shared provider.
-
-### AWS Outputs And GitHub Configuration
-
-Read the non-secret outputs after the real CDK deployment:
-
-```powershell
-$outputs = (Get-Content infra/outputs.json -Raw | ConvertFrom-Json).PerthPlannerProduction
-$outputs | Format-List
-Write-Output $outputs.CloudFrontUrl
-```
-
-Outputs are also visible in the CloudFormation console. In GitHub repository
-Settings > Secrets and variables > Actions > Variables, add these **repository
-variables**, not secrets:
-
-| GitHub variable | Stack output |
-| --- | --- |
-| `AWS_REGION` | `AwsRegion` |
-| `S3_BUCKET_NAME` | `S3BucketName` |
-| `CLOUDFRONT_DISTRIBUTION_ID` | `CloudFrontDistributionId` |
-| `CLOUDFRONT_URL` | `CloudFrontUrl` |
-| `AWS_ROLE_ARN` | `GitHubDeploymentRoleArn` |
-
-Do not attach a GitHub environment to the deployment job without also deliberately
-changing the IAM trust: environment subjects differ from the current branch subject.
-
-### GitHub Actions Release
-
-Commit the application, assets, licenses, workflow, infrastructure source/lockfile,
-test scripts, and documentation to `main`. Generated output and dependencies stay
-ignored. This coding task stages files but does not commit or push them for you.
-
-```powershell
-git status
-git diff --cached --stat
-git commit -m "Add first production CDK and OIDC deployment pipeline"
-git push origin main
-```
-
-The workflow `Validate and Deploy Perth Planner` runs syntax checks, independent
-PWA/offline browser tests, infrastructure/workflow assertions, and offline CDK
-synthesis. It packages only the explicit allowlist in `scripts/package-site.cjs`
-into ignored `.deployment/`, adding `deployment.json` with the commit SHA and file
-hashes. `.git/`, `.github/`, `infra/`, `scripts/`, dependencies, docs, editor files,
-and temporary files are never uploaded. Relative application paths stay unchanged.
-
-PRs to `main` validate only; they get no AWS OIDC permission. Pushes to `main` and
-manual dispatch on `main` deploy the validated artifact. Deployment jobs are
-serialized and not cancelled midway. There is no dependency install/build in the
-deployment job. The command is `node scripts/deploy-site.cjs` after OIDC auth.
-
-It syncs assets with deletion of obsolete keys, uploads HTML/manifest/release
-metadata, then publishes the worker last. All current files are unhashed and get
-`public,max-age=0,must-revalidate`; CloudFront's minimum TTL is zero. MIME types are
-detected by AWS CLI, with an explicit `application/manifest+json` override for the
-manifest. Versioned S3 keeps previous object versions; deletion removes live keys,
-not historical versions. The dedicated bucket must not contain unrelated data.
-
-After upload the workflow checks S3 inventory, submits `/*` invalidation, waits for
-completion, and verifies HTTP 200 and hashes of the root page and every released
-file, including manifest, worker, and JavaScript. Any failed step stops deployment.
-S3 multi-object publishing is not atomic; rerun a failed deployment to recover.
-
-### Verify, Redeploy, And Roll Back
-
-Wait for a successful GitHub Actions run, then open the generated CloudFront URL
-on a fresh browser/profile. Confirm the footer reports offline readiness and test
-offline reload. Existing installed clients may keep their previous worker until
-all planner windows close, as documented under Updates.
-
-To verify the exact release independently, download the matching
-`production-site-<commit>` artifact from the successful Actions run and extract it
-into `.deployment/`. Do not regenerate this verification package from a Windows
-checkout: Git line-ending conversion can change hashes without changing behavior.
-
-```powershell
-$env:CLOUDFRONT_URL = $outputs.CloudFrontUrl
-node scripts/verify-deployment.cjs
-Invoke-WebRequest "$($outputs.CloudFrontUrl)/deployment.json"
-```
-
-Manual redeployment: GitHub Actions > Validate and Deploy Perth Planner > Run
-workflow > select `main`. Non-main manual runs do not deploy. Re-running a failed
-deployment run is also supported.
-
-Rollback uses a reviewed revert commit on `main`, not a manual dispatch from an
-old branch. Revert the unwanted application changes, preserving the deployment
-tooling. For changed PWA files, give the restored worker a **new** `CACHE_NAME` and
-update the footer date before committing; otherwise offline clients can retain the
-previous cache. Push the rollback commit and let the same pipeline validate,
-upload, invalidate, and verify it. The new `deployment.json` identifies the rollback
-commit. Do not blindly revert the entire initial pipeline commit. S3 versioning is
-an additional recovery aid, not the routine rollback mechanism.
-
-No production URL exists until CDK deployment succeeds, and no application is
-published until an actual GitHub Actions deployment completes successfully.
+Do not claim production deployment succeeded until the actual Actions run and
+CloudFront release verification succeed. This cleanup performs neither.

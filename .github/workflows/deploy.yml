@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   validate:
-    name: Validate Static Site and Infrastructure
+    name: Validate Static Site
     runs-on: ubuntu-22.04
     timeout-minutes: 20
     steps:
@@ -24,15 +24,26 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
-          cache: npm
-          cache-dependency-path: infra/package-lock.json
-      - name: Install infrastructure validation dependencies
-        run: npm ci --prefix infra
       - name: Check application JavaScript
         run: |
           node --check app.js
           node --check data.js
           node --check sw.js
+      - name: Check deployment policies and release packaging
+        run: node --test scripts/deployment.test.cjs
+      - name: Validate workflow YAML
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://github.com/rhysd/actionlint/releases/download/v1.7.12"
+          archive="actionlint_1.7.12_linux_amd64.tar.gz"
+          directory="$(mktemp -d)"
+          trap 'rm -rf "$directory"' EXIT
+          curl --fail --silent --show-error --location "$base/$archive" --output "$directory/$archive"
+          curl --fail --silent --show-error --location "$base/actionlint_1.7.12_checksums.txt" --output "$directory/checksums.txt"
+          (cd "$directory" && grep "  $archive$" checksums.txt | sha256sum --check --strict)
+          tar -xzf "$directory/$archive" -C "$directory" actionlint
+          "$directory/actionlint" -shellcheck= .github/workflows/deploy.yml
       - name: Install Chromium
         id: chromium
         uses: browser-actions/setup-chrome@48ad923757ca74d66703209fe939badbdf80f2f4
@@ -44,14 +55,6 @@ jobs:
         env:
           PWA_BROWSER: ${{ steps.chromium.outputs.chrome-path }}
         run: node scripts/check-pwa.cjs
-      - name: Test infrastructure, workflow, and release packaging
-        run: npm test --prefix infra
-      - name: Synthesize without AWS access (test account only)
-        working-directory: infra
-        env:
-          CDK_DEFAULT_ACCOUNT: '111111111111'
-          AWS_REGION: ap-south-1
-        run: npx cdk synth --no-lookups --quiet
       - name: Package production files
         run: node scripts/package-site.cjs
       - name: Upload validated release artifact
@@ -81,7 +84,6 @@ jobs:
       S3_BUCKET_NAME: ${{ vars.S3_BUCKET_NAME }}
       CLOUDFRONT_DISTRIBUTION_ID: ${{ vars.CLOUDFRONT_DISTRIBUTION_ID }}
       CLOUDFRONT_URL: ${{ vars.CLOUDFRONT_URL }}
-      AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
     steps:
       - name: Checkout deployment tooling
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -95,7 +97,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for variable in AWS_REGION S3_BUCKET_NAME CLOUDFRONT_DISTRIBUTION_ID CLOUDFRONT_URL AWS_ROLE_ARN; do
+          for variable in AWS_REGION S3_BUCKET_NAME CLOUDFRONT_DISTRIBUTION_ID CLOUDFRONT_URL; do
             if [[ -z "${!variable}" ]]; then
               echo "::error::Missing GitHub repository variable: $variable"
               exit 1
@@ -109,7 +111,8 @@ jobs:
       - name: Authenticate to AWS with GitHub OIDC
         uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a
         with:
-          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          role-to-assume: arn:aws:iam::176515272004:role/PerthPlannerProduction-GitHubDeploymentRoleD4E2A70A-Dqi5GmCCzaKQ
+          allowed-account-ids: '176515272004'
           aws-region: ${{ vars.AWS_REGION }}
           role-session-name: perth-planner-${{ github.run_id }}
           role-duration-seconds: 3600
