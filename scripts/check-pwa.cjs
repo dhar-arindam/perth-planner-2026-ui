@@ -158,11 +158,15 @@ async function main() {
     assert.deepEqual(parsedManifest.errors, []);
     const cacheCount = await evaluate('(async () => { const names = await caches.keys(); return (await (await caches.open(names[0])).keys()).length; })()');
     assert.equal(cacheCount, 13);
+    const displayedVersion = await evaluate('document.querySelector("#planner-version").textContent');
+    assert.match(displayedVersion, /^Version v\d+$/);
+    assert.equal(await evaluate(`caches.has('perth-trip-planner-${displayedVersion.replace('Version ', '')}')`), true, 'Footer version must match the installed shell cache');
     console.log('PASS: production static files, browser manifest, PNG icons, service-worker activation, complete shell cache');
 
     await command('Network.emulateNetworkConditions', { offline: true, latency: 0, downloadThroughput: 0, uploadThroughput: 0 });
     await reload();
     assert.equal(await evaluate('navigator.onLine'), false);
+    assert.equal(await evaluate('document.querySelector("#planner-version").textContent'), displayedVersion, 'Footer version must remain available offline');
     assert.equal(await evaluate('!!navigator.serviceWorker.controller && window.TRIP.days.length === 15'), true);
     assert.equal(await evaluate('document.querySelectorAll(".day-card").length'), 15);
     assert.equal(await evaluate('document.querySelector("#stay").innerText.includes("11 Mount Street")'), true);
@@ -224,7 +228,7 @@ async function main() {
     assert.equal(await evaluate('document.querySelector("#today-events").innerText.includes("Offline actual activity")'), false);
     console.log('PASS: offline cold reload, all 15 dates, all weekend options, hotels/work/flights, checklist/budget/ad-hoc persistence, planned/actual restore');
 
-    for (const width of [320, 375, 390, 430]) {
+    for (const width of [320, 375, 384, 390, 412, 430]) {
       await command('Emulation.setDeviceMetricsOverride', { width, height: 844, deviceScaleFactor: 1, mobile: true });
       assert.equal(await evaluate('getComputedStyle(document.querySelector(".top-nav")).display !== "none"'), true, `${width}px section navigation hidden`);
       const anchor = await evaluate(`(() => {
@@ -237,6 +241,18 @@ async function main() {
       })()`);
       assert.equal(anchor.headerTop, 0, `${width}px sticky header position`);
       assert.ok(anchor.targetTop >= anchor.headerBottom, `${width}px section hidden under header`);
+      for (const scrollTarget of ['0', 'document.documentElement.scrollHeight']) {
+        const headerVisible = await evaluate(`new Promise((resolve) => {
+          window.scrollTo(0, ${scrollTarget});
+          requestAnimationFrame(() => {
+            const header = document.querySelector('.topbar');
+            const bounds = header.getBoundingClientRect();
+            resolve(bounds.top === 0 && bounds.bottom > 0 && bounds.bottom < innerHeight &&
+              header.contains(document.elementFromPoint(innerWidth / 2, bounds.bottom - 2)));
+          });
+        })`);
+        assert.equal(headerVisible, true, `${width}px header hidden at scroll target ${scrollTarget}`);
+      }
       for (const id of ['option1', 'option2', 'option3']) {
         await evaluate(`document.querySelector('#option-selector [data-option="${id}"]').click()`);
         assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true, `${width}px ${id} overflow`);
@@ -246,7 +262,7 @@ async function main() {
     await evaluate('document.fonts.ready');
     assert.equal(await evaluate('document.fonts.check("12px Manrope") && document.fonts.check("12px \\"DM Sans\\"")'), true);
     assert.deepEqual(errors, []);
-    console.log('PASS: 320/375/390/430px with all options, external-link cues, offline fonts, no console errors');
+    console.log('PASS: 320/375/384/390/412/430px with visible sticky header, all options, external-link cues, offline fonts, no console errors');
   } finally {
     socket?.close();
     if (browser && browser.exitCode === null && browser.signalCode === null) {

@@ -33,7 +33,7 @@ offline support.
 
 When changing application files or trip data:
 
-1. Increment `CACHE_NAME` in `sw.js` and update the footer's trip-planner date.
+1. Increment `CACHE_NAME` in `sw.js`, match the footer's version label to that cache version, and update the footer's trip-planner date.
 2. Add any new runtime assets to `APP_SHELL` and deploy all files together.
 3. Reopen the app online. The browser downloads a complete new cache in the background.
 4. Close all planner tabs/windows and reopen once the download finishes to use the new version.
