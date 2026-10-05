@@ -119,6 +119,34 @@ async function main() {
     await command('Page.navigate', { url: origin });
     await completion;
     assert.equal(await evaluate('document.title'), 'Perth Trip Planner');
+    const navigation = await evaluate(`(() => ({
+      links: [...document.querySelectorAll('.top-nav a')].map((link) => [link.hash, Boolean(document.querySelector(link.hash))]),
+      home: document.querySelector('.wordmark').hash,
+      skip: document.querySelector('.skip-link').hash,
+      headerPosition: getComputedStyle(document.querySelector('.topbar')).position,
+      sections: [...document.querySelectorAll('main > section')].map((section) => section.id),
+      heroCta: document.querySelector('.hero-cta').hash,
+      date: document.querySelector('#today-date').value,
+      title: document.querySelector('#today-title').textContent,
+      badge: document.querySelector('.preview-pill').textContent
+    }))()`);
+    assert.deepEqual(navigation.links, [['#today', true], ['#flights', true], ['#weekend', true], ['#stay', true], ['#itinerary', true], ['#essentials', true]]);
+    assert.equal(navigation.home, '#top');
+    assert.equal(navigation.skip, '#today');
+    assert.equal(navigation.headerPosition, 'sticky');
+    assert.deepEqual(navigation.sections, ['top', 'today', 'flights', 'weekend', 'stay', 'itinerary', 'essentials']);
+    assert.equal(navigation.heroCta, '#today');
+    const localDate = await evaluate(`(() => {
+      const trip = TRIP.trip;
+      const parts = Object.fromEntries(new Intl.DateTimeFormat('en-AU', {
+        timeZone: trip.timezone, year: 'numeric', month: '2-digit', day: '2-digit'
+      }).formatToParts(new Date()).filter(({ type }) => type !== 'literal').map(({ type, value }) => [type, value]));
+      return [parts.year, parts.month, parts.day].join('-');
+    })()`);
+    const expectedDate = localDate < '2026-10-10' ? '2026-10-10' : localDate > '2026-10-24' ? '2026-10-24' : localDate;
+    assert.equal(navigation.date, expectedDate);
+    assert.equal(navigation.title, localDate < '2026-10-10' ? 'Your first day, in a glance' : localDate > '2026-10-24' ? 'Final trip day, in a glance' : 'Today, in a glance');
+    assert.equal(navigation.badge, localDate < '2026-10-10' ? 'NEXT UP' : localDate > '2026-10-24' ? 'FINAL DAY' : 'TODAY');
     await evaluate(`new Promise((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error('Service worker readiness timed out')), 20000);
       navigator.serviceWorker.ready.then(() => {
@@ -142,7 +170,10 @@ async function main() {
     const interactions = await evaluate(`(() => {
       const changeDate = (date) => { const input = document.querySelector('#today-date'); input.value = date; input.dispatchEvent(new Event('change', { bubbles: true })); };
       const results = { dates: [], options: [] };
-      for (const day of TRIP.days) { changeDate(day.date); results.dates.push(document.querySelector('#selected-day-title').textContent.length > 0); }
+      for (const day of TRIP.days) {
+        changeDate(day.date);
+        results.dates.push({ date: day.date, title: document.querySelector('#today-title').textContent, badge: document.querySelector('.preview-pill').textContent, hasSelectedDay: document.querySelector('#selected-day-title').textContent.length > 0 });
+      }
       for (const id of ['option1', 'option2', 'option3']) {
         document.querySelector('#option-selector [data-option="' + id + '"]').click();
         results.options.push(document.querySelector('#option-detail').innerText.includes('PREVIEW') && document.querySelector('#weekend-day-detail').innerText.length > 100);
@@ -169,7 +200,14 @@ async function main() {
       results.added = document.querySelector('#today-events').innerText.includes('Offline added activity');
       return results;
     })()`);
-    assert.ok(interactions.dates.every(Boolean));
+    const expectedDateLabels = interactions.dates.map(({ date }, index) => {
+      if (date === localDate) return ['Today, in a glance', 'TODAY'];
+      if (localDate < '2026-10-10' && date === '2026-10-10') return ['Your first day, in a glance', 'NEXT UP'];
+      if (localDate > '2026-10-24' && date === '2026-10-24') return ['Final trip day, in a glance', 'FINAL DAY'];
+      return [`Day ${String(index + 1).padStart(2, '0')}, in a glance`, 'DATE PREVIEW'];
+    });
+    assert.deepEqual(interactions.dates.map(({ title, badge }) => [title, badge]), expectedDateLabels);
+    assert.ok(interactions.dates.every(({ hasSelectedDay }) => hasSelectedDay));
     assert.ok(interactions.options.every(Boolean));
     assert.ok(interactions.original && interactions.actual && interactions.added);
     await reload();
@@ -188,6 +226,17 @@ async function main() {
 
     for (const width of [320, 375, 390, 430]) {
       await command('Emulation.setDeviceMetricsOverride', { width, height: 844, deviceScaleFactor: 1, mobile: true });
+      assert.equal(await evaluate('getComputedStyle(document.querySelector(".top-nav")).display !== "none"'), true, `${width}px section navigation hidden`);
+      const anchor = await evaluate(`(() => {
+        document.documentElement.style.scrollBehavior = 'auto';
+        const section = document.querySelector('#weekend');
+        section.scrollIntoView();
+        const header = document.querySelector('.topbar').getBoundingClientRect();
+        const target = section.getBoundingClientRect();
+        return { headerTop: header.top, headerBottom: header.bottom, targetTop: target.top };
+      })()`);
+      assert.equal(anchor.headerTop, 0, `${width}px sticky header position`);
+      assert.ok(anchor.targetTop >= anchor.headerBottom, `${width}px section hidden under header`);
       for (const id of ['option1', 'option2', 'option3']) {
         await evaluate(`document.querySelector('#option-selector [data-option="${id}"]').click()`);
         assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true, `${width}px ${id} overflow`);

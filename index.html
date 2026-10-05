@@ -17,20 +17,35 @@
     <script src="app.js" defer></script>
   </head>
   <body>
-    <a class="skip-link" href="#main">Skip to itinerary</a>
+    <a class="skip-link" href="#today">Skip to daily briefing</a>
     <header class="topbar">
       <a class="wordmark" href="#top" aria-label="Perth trip planner home"><span class="wordmark-mark">P</span><span>PERTH TRIP PLANNER</span></a>
       <nav class="top-nav" aria-label="Page sections">
-        <a href="#itinerary">Itinerary</a>
+        <a href="#today">Today</a>
         <a href="#flights">Flights</a>
-        <a href="#stay">Trip essentials</a>
         <a href="#weekend">Weekend</a>
+        <a href="#stay">Trip essentials</a>
+        <a href="#itinerary">Itinerary</a>
         <a href="#essentials">Essentials</a>
       </nav>
-      <a class="top-date" href="#today"><span class="live-dot"></span> 10–24 OCT 2026</a>
+      <span class="top-date"><span class="live-dot" aria-hidden="true"></span> 10–24 OCT 2026</span>
     </header>
 
     <main id="main">
+      <section class="hero" id="top" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="eyebrow"><span>WESTERN AUSTRALIA</span><span class="eyebrow-rule"></span><span>01 / 01</span></p>
+          <h1 id="hero-title">Perth,<br><em>at your pace.</em></h1>
+          <p class="hero-lede">A little work. A lot of river air.<br>Your Perth field guide, 10–24 October 2026.</p>
+          <a class="hero-cta" href="#today">See the day <span aria-hidden="true">↓</span></a>
+        </div>
+        <div class="hero-image" role="img" aria-label="Ocean meeting the coastline in Western Australia">
+          <div class="image-caption"><span>THE WEST COAST</span><span>31° 57′ S / 115° 51′ E</span></div>
+          <div class="hero-image-label">INDIAN<br>OCEAN</div>
+        </div>
+        <div class="hero-bottom"><span>SOLO WORK TRIP</span><span>WALK · TRAIN · FERRY · UBER</span><span>PERTH, WA</span></div>
+      </section>
+
       <section class="today-section section-shell" id="today" aria-labelledby="today-title">
         <div class="section-heading">
           <div><p class="eyebrow">YOUR POCKET BRIEFING</p><h2 id="today-title">Today, in a glance</h2></div>
@@ -77,20 +92,6 @@
       </section>
 
       <section class="stay-strip section-shell" id="stay" aria-label="Trip essentials"></section>
-
-      <section class="hero" id="top" aria-labelledby="hero-title">
-        <div class="hero-copy">
-          <p class="eyebrow"><span>WESTERN AUSTRALIA</span><span class="eyebrow-rule"></span><span>01 / 01</span></p>
-          <h1 id="hero-title">Perth,<br><em>at your pace.</em></h1>
-          <p class="hero-lede">A little work. A lot of river air.<br>Your Perth field guide, 10–24 October 2026.</p>
-          <a class="hero-cta" href="#today">See the day <span aria-hidden="true">↓</span></a>
-        </div>
-        <div class="hero-image" role="img" aria-label="Ocean meeting the coastline in Western Australia">
-          <div class="image-caption"><span>THE WEST COAST</span><span>31° 57′ S / 115° 51′ E</span></div>
-          <div class="hero-image-label">INDIAN<br>OCEAN</div>
-        </div>
-        <div class="hero-bottom"><span>SOLO WORK TRIP</span><span>WALK · TRAIN · FERRY · UBER</span><span>PERTH, WA</span></div>
-      </section>
 
       <section class="itinerary-section section-shell" id="itinerary" aria-labelledby="itinerary-title">
         <div class="section-heading itinerary-heading">
@@ -142,6 +143,6 @@
       </form>
     </dialog>
 
-    <footer class="footer"><a class="wordmark footer-mark" href="#top"><span class="wordmark-mark">P</span><span>PERTH TRIP PLANNER</span></a><span class="planner-updated">Trip planner updated: <time datetime="2026-10-04">4 October 2026</time><span id="offline-status" role="status">Offline setup pending</span></span><a href="#top">Back to top ↑</a></footer>
+    <footer class="footer"><a class="wordmark footer-mark" href="#top"><span class="wordmark-mark">P</span><span>PERTH TRIP PLANNER</span></a><span class="planner-updated">Trip planner updated: <time datetime="2026-10-05">5 October 2026</time><span id="offline-status" role="status">Offline setup pending</span></span><a href="#top">Back to top ↑</a></footer>
   </body>
 </html>

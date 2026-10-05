@@ -174,9 +174,28 @@
   const currentDate = () => $('#today-date').value;
   $('#today-date').min = trip.trip.start;
   $('#today-date').max = trip.trip.end;
-  $('#today-date').value = trip.trip.start;
+  const perthDateParts = new Intl.DateTimeFormat('en-AU', {
+    timeZone: trip.trip.timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(new Date());
+  const perthDate = Object.fromEntries(perthDateParts
+    .filter(({ type }) => type !== 'literal')
+    .map(({ type, value }) => [type, value]));
+  const todayDate = `${perthDate.year}-${perthDate.month}-${perthDate.day}`;
+  $('#today-date').value = todayDate < trip.trip.start ? trip.trip.start : todayDate > trip.trip.end ? trip.trip.end : todayDate;
   let activeFilter = 'all';
   let weekendChoice = null;
+
+  function briefingContext() {
+    const selectedDate = currentDate();
+    const tripDayNumber = trip.days.findIndex(({ date }) => date === selectedDate) + 1;
+    if (selectedDate === todayDate) return { title: 'Today, in a glance', badge: 'TODAY' };
+    if (todayDate < trip.trip.start && selectedDate === trip.trip.start) return { title: 'Your first day, in a glance', badge: 'NEXT UP' };
+    if (todayDate > trip.trip.end && selectedDate === trip.trip.end) return { title: 'Final trip day, in a glance', badge: 'FINAL DAY' };
+    return { title: `Day ${String(tripDayNumber).padStart(2, '0')}, in a glance`, badge: 'DATE PREVIEW' };
+  }
 
   const dateParts = (date) => {
     const parsed = new Date(`${date}T00:00:00Z`);
@@ -340,6 +359,8 @@
   function getTodaySummary() {
     const day = dayFor(currentDate());
     if (!day) return;
+    const context = briefingContext();
+    $('#today-title').textContent = context.title;
     const workday = isWorkday(day);
     const onLeave = day.date === '2026-10-16' && ['option2', 'option3'].includes(weekendChoice);
     const nextEvent = effectiveEvents(day.date, day).find((event) => !event.completed) || { time: 'Flexible', title: 'No activity planned', type: 'free', transport: 'At your discretion' };
@@ -379,7 +400,7 @@
     const nextLocation = nextEvent.location ? trip.locations[nextEvent.location] : null;
     const category = nextType.toUpperCase();
     const where = day.destination || location?.name || (day.date === '2026-10-11' ? 'Perth Airport → Perth' : day.base);
-    $('#today-content').innerHTML = `<div class="today-primary"><div class="today-date-line"><span>${dateParts(day.date).shortDay} / ${dateParts(day.date).shortDate}</span><span class="preview-pill">TRIP DATE PREVIEW</span></div><p class="today-status">${esc(status)}</p><h3>${esc(day.title)}</h3><p class="today-location"><span>WHERE</span><strong>${esc(where)}</strong></p><p class="today-description">${esc(day.activity)}</p><div class="today-next"><span class="next-icon" aria-hidden="true">↗</span><div class="next-details"><span class="eyebrow">NEXT UP</span><div class="next-heading"><span class="event-type event-type-${esc(nextType)}">${esc(category)}</span><time>${esc(nextEvent.time)}</time></div><strong>${esc(next)}</strong><span>${esc(transport)}</span>${nextEvent.query ? mapsLink(nextEvent.query, 'Navigate to next stop') : nextLocation ? mapsLink(nextLocation.query, `Navigate to ${nextLocation.name}`) : ''}</div></div></div><div class="today-side"><div class="brief-row"><span class="eyebrow">HOTEL</span>${hotelBrief}</div>${workday && !onLeave ? `<div class="brief-row"><span class="eyebrow">WORK / 8:00 AM–4:00 PM</span><strong>${esc(trip.work.name)}</strong><span>${esc(trip.work.address)}</span>${mapsLink(trip.work.query, 'Navigate to Woodside')}</div>` : ''}<div class="brief-row"><span class="eyebrow">TRANSPORT</span><strong>${esc(transport)}</strong>${location ? mapsLink(location.query, `Navigate to ${location.name}`) : ''}</div><div class="brief-reminder"><span class="eyebrow">REMINDER</span><p>${esc(reminder)}</p></div></div>`;
+    $('#today-content').innerHTML = `<div class="today-primary"><div class="today-date-line"><span>${dateParts(day.date).shortDay} / ${dateParts(day.date).shortDate}</span><span class="preview-pill">${context.badge}</span></div><p class="today-status">${esc(status)}</p><h3>${esc(day.title)}</h3><p class="today-location"><span>WHERE</span><strong>${esc(where)}</strong></p><p class="today-description">${esc(day.activity)}</p><div class="today-next"><span class="next-icon" aria-hidden="true">↗</span><div class="next-details"><span class="eyebrow">NEXT UP</span><div class="next-heading"><span class="event-type event-type-${esc(nextType)}">${esc(category)}</span><time>${esc(nextEvent.time)}</time></div><strong>${esc(next)}</strong><span>${esc(transport)}</span>${nextEvent.query ? mapsLink(nextEvent.query, 'Navigate to next stop') : nextLocation ? mapsLink(nextLocation.query, `Navigate to ${nextLocation.name}`) : ''}</div></div></div><div class="today-side"><div class="brief-row"><span class="eyebrow">HOTEL</span>${hotelBrief}</div>${workday && !onLeave ? `<div class="brief-row"><span class="eyebrow">WORK / 8:00 AM–4:00 PM</span><strong>${esc(trip.work.name)}</strong><span>${esc(trip.work.address)}</span>${mapsLink(trip.work.query, 'Navigate to Woodside')}</div>` : ''}<div class="brief-row"><span class="eyebrow">TRANSPORT</span><strong>${esc(transport)}</strong>${location ? mapsLink(location.query, `Navigate to ${location.name}`) : ''}</div><div class="brief-reminder"><span class="eyebrow">REMINDER</span><p>${esc(reminder)}</p></div></div>`;
   }
 
   function renderDay(day) {
