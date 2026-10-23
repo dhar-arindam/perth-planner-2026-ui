@@ -36,6 +36,7 @@ const southwestDayTwo = {
 };
 
 window.TRIP = {
+  chosenWeekendOption: 'option1',
   trip: { start: '2026-10-10', end: '2026-10-24', timezone: 'Australia/Perth' },
   flightJourneys: [
     { id: 'outbound', direction: 'OUTBOUND', dateLabel: '10–11 Oct 2026', cabin: 'Business Class (Z)', layover: { airportCode: 'SIN', duration: '3 hours 20 minutes' }, totalDuration: '13 hours 05 minutes', segmentIds: ['SQ511', 'SQ223'] },
@@ -117,14 +118,29 @@ window.TRIP = {
     reminder: 'CONFIRM WITH DOUBLETREE THAT THEY CAN HOLD YOUR MAIN LUGGAGE BEFORE CHECK-IN.'
   },
   rottnestPlan: [
-    { time: '~7:45 AM', title: 'Walk DoubleTree → Barrack Street Jetty', transport: 'Walk', type: 'travel' },
-    { time: '~8:30 AM', title: 'Ferry departure', transport: 'Ferry · verify timetable and booking', type: 'travel' },
-    { time: '~10:00 AM', title: 'Arrive Rottnest Island', transport: 'Walk / cycle / e-bike', type: 'travel' },
-    { time: '10:00 AM–4:30 PM', title: 'Quokkas, The Basin, Longreach or Geordie Bay, lunch and beach time', transport: 'Walking / cycle / e-bike', type: 'activity', note: 'Keep the day flexible; check weather and island conditions.' },
-    { time: '~5:00 PM', title: 'Ferry back to Perth', transport: 'Ferry · verify timetable', type: 'travel' },
-    plannedDinner,
-    flexibleEvening
+    { id: 'planned-0', time: '8:45 AM (proposed)', title: 'Leave DoubleTree by Hilton Perth Waterfront', transport: 'Walk', type: 'travel', note: 'Walk to the booked Perth ferry departure point. Barrack Street Jetty is a suggestion only; the booking takes precedence.' },
+    { id: 'rottnest-checkin', time: '9:00 AM (proposed)', title: 'Jetty arrival and check-in', transport: 'Walk', type: 'travel', note: 'Follow the ferry operator’s check-in instructions. Move hotel departure and check-in earlier if the booking requires it.' },
+    { id: 'planned-1', time: '9:30 AM (unconfirmed)', title: 'Proposed ferry to Rottnest', transport: 'Ferry · booking takes precedence', type: 'travel', note: 'Only use this departure if confirmed by your actual booking; not a guaranteed service. Allow for the Perth sailing duration before choosing island stops.' },
+    { id: 'planned-2', time: 'Upon arrival', title: 'Thomson Bay settlement and quokkas', transport: 'Walk', type: 'activity', note: 'Explore at an easy pace. Do not feed or touch quokkas.' },
+    { id: 'rottnest-beach', time: 'Late morning / after arrival', title: 'The Basin or another suitable nearby beach', transport: 'Island Explorer + walking · confirm access', type: 'activity', modeStop: true, note: 'Check the current service map and timetable for a suitable stop and walking distance; this is not a verified bus stop. Shorten the plan if the ferry arrives later.' },
+    { id: 'rottnest-second', time: 'Around noon / if time permits', title: 'Geordie Bay or another reachable beach', transport: 'Island Explorer + walking · confirm access', type: 'activity', modeStop: true, optional: true, note: 'Only include a second stop supported by the current timetable and service map. Not every beach is bus-accessible.' },
+    { id: 'rottnest-lunch', time: 'Lunch', title: 'Settlement lunch or a verified food option', transport: 'Walk / bus as verified', type: 'food', note: 'Check opening hours and the return connection before eating away from the settlement.' },
+    { id: 'rottnest-extra', time: 'Early afternoon / if time permits', title: 'One more nearby stop or relaxed settlement time', transport: 'Island Explorer + walking · confirm service', type: 'activity', modeStop: true, optional: true, note: 'Prefer fewer stops. Do not plan a remote beach stop that risks missing the return ferry.' },
+    { id: 'rottnest-boarding', time: 'Before booked departure', title: 'Return to the ferry terminal with a boarding buffer', transport: 'Walk / verified bus connection', type: 'travel', note: 'Work backwards from the booked sailing and operator’s boarding deadline. Allow for bus waits, walking and delays; leave extra time rather than relying on the last connection.' },
+    { id: 'planned-4', time: '4:15 PM (unconfirmed)', title: 'Proposed return ferry to Perth', transport: 'Ferry · booking takes precedence', type: 'travel', note: 'Only use this return if confirmed by your actual booking; not a guaranteed service. Check the return destination and sailing duration.' },
+    { ...plannedDinner, id: 'planned-5' },
+    { ...flexibleEvening, id: 'planned-6' }
   ],
+  rottnestBicycleStops: [
+    { id: 'planned-3', time: 'After arrival / flexible', title: 'Quokkas, The Basin and a short bicycle outing', transport: 'Bicycle + walking', type: 'activity', note: 'Hire a bicycle only if desired; choose a short out-and-back ride, not a compulsory island loop. Cycling the entire island can take several hours, with hills and exposed sections. Allow time to return the bicycle before boarding.' }
+  ],
+  rottnestGuide: {
+    url: 'https://www.rottnestisland.com/visit/getting-around/by-bus',
+    service: 'Official bus information checked 16 October 2026: Quokka Coaches Island Explorer is a hop-on, hop-off service, an alternative to bicycle hire for reaching major island attractions. It is separate from the settlement shuttle. Not every location or beach is accessible by bus; walking may be required.',
+    verification: 'Needs confirmation: current route, stop count, frequency, operating hours, ticket price, ticket requirements and seasonal availability. The current timetable could not be verified. Check the official timetable and service map before choosing stops; no bus departures or beach stops here are confirmed.',
+    ferry: 'All suggested timings are provisional, not confirmed transport schedules. Your booked Perth departure point, ferry times, check-in and boarding requirements take precedence. Adjust island stops to the actual arrival and return sailing.',
+    preparation: 'Bring water, sunscreen, a hat and comfortable footwear; add swimwear and a towel if swimming. Do not feed or touch quokkas. Check weather, ferry operator updates, bus ticket requirements and service times before leaving. Avoid remote stops that risk the return ferry.'
+  },
   fremantlePlan: [
     { time: '~9:30 AM', title: 'Train Perth → Fremantle', transport: 'Train · verify journey planner', type: 'travel' },
     { time: '~10:15 AM', title: 'Fremantle Markets', transport: 'Walk', type: 'activity', location: 'fremantle' },

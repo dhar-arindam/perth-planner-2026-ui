@@ -24,10 +24,81 @@ and schedules still need internet and are explicitly labelled. Third-party sites
 are not intercepted or cached.
 
 Checklist, budget, flight reminders, and actual-plan edits retain their existing
-`localStorage` keys and behavior. Weekend preview choices remain temporary;
-reselect the same option after reopening to see that option's saved actual plans.
+`localStorage` keys and behavior. Option 1 is recorded as the chosen weekend plan
+in trip data and opens automatically. Other weekend previews remain temporary;
+clearing a preview or reopening returns to Option 1 and its saved actual plans.
 No trip records, dates, flight details, work hours, or meal plans are changed by
 offline support.
+
+## Rottnest Island Transport
+
+Rottnest (Saturday in Option 1, Sunday in Option 2) defaults to **Bus and walking**.
+The Island Explorer guide and transport radio controls appear in both the weekend
+preview and the selected day's planned/actual editor. **Bicycle** retains a short,
+optional outing rather than requiring a full island loop. The transport choice is
+saved on this device under `perth-trip-rottnest-mode`; weekend previews still reset
+on reload to the chosen Option 1. Preview Option 2 again to reopen its saved actual plan.
+
+Both modes support existing edit, skip, done, add and restore controls. Shared
+ferry/dinner edits and added activities remain available across modes; mode-specific
+stop edits remain attached to their own stops. Existing actual-plan keys and legacy
+event IDs remain intact, including the original cycling activity in Bicycle mode.
+
+The 8:45/9:00 hotel/check-in plan and 9:30 AM/4:15 PM ferries are proposals only.
+Booked departure points, sailings and operator boarding requirements take precedence.
+The official bus page was checked on 16 October 2026 and confirms Quokka Coaches
+Island Explorer as a hop-on, hop-off service, separate from the settlement shuttle.
+No current ferry booking or Island Explorer timetable was verified for this update.
+Beach choices require the current official service map, timetable and walking-access
+check; they are not claims of named bus stops. Verify routes, stop count, frequency,
+hours, prices, ticket requirements and seasonal availability at the
+[official bus information page](https://www.rottnestisland.com/visit/getting-around/by-bus).
+The guide and itinerary remain offline; official websites require internet.
+
+## AI Travel Guide
+
+The optional guide appears below the daily plan. It is **not connected by default**;
+the existing planner remains fully usable offline. AI needs connectivity and an
+owner-only OAuth sign-in. No live weather, timetable, routing or opening-hours
+integration is included. Chat proposals require an explicit Apply action and use
+the existing planned/actual storage; fixed commitments cannot be changed by AI.
+AI proposals now carry five-minute P-256 signatures bound to their exact changes,
+trip revision, context, owner and session. Apply requires an authenticated server
+confirmation and a verified apply receipt; it is unavailable offline, while the
+manual itinerary editor stays offline-capable. The backend requires canonical
+commitment metadata and strict gateway claims. It retrieves its server-only key
+from one configured Secrets Manager ARN with the execution role, validates the
+public half, and caches only the validated KeyObject for at most 60 seconds. Raw
+PEM environment values are rejected; only the ARN and public pin are configured.
+The browser receives only the matching public JWK. See the setup guide for the
+environment settings and the stateless replay limitations. Stage 2B verified the
+deployed Secrets Manager signer path while chat remained disabled; Bedrock and
+frontend integration remain unconfigured and unverified.
+
+Tap **Use my location** to request browser location permission for a single reading.
+The guide shows coordinates, accuracy and the observation time in Perth. It does
+not track in the background or request permission on page load. HTTPS or localhost
+is required; permission denial, unavailable location and timeout leave manual entry
+available. **Clear location** removes it from subsequent chat snapshots. A reading
+stays in memory for this page and is sent with your chat message or server
+confirmation of AI changes (confirmation itself does not invoke the model);
+there is no reverse-geocoding lookup or automatic place-name detection. Device
+location can be requested without AI sign-in, but AI chat still needs its setup
+and connectivity. Device/browser location availability offline is not guaranteed.
+Conversations that use location stay in memory and clear on reload, so an AI reply
+cannot save echoed coordinates into chat history. Clear location stops including
+the reading in new snapshots; Clear chat also resets the in-memory conversation.
+Ordinary non-location chats retain their existing bounded session history.
+Coordinate-like precise decimal values and degrees/minutes/seconds are rejected in AI-generated itinerary
+titles/notes. A coarse device reading is labelled approximate; a manual landmark
+is often more useful than an inaccurate position.
+
+See [AI setup, architecture, security, costs and verification](docs/travel-guide.md)
+before creating any AWS resources or filling in the public configuration. Approved
+disabled-backend provisioning and selected real authentication checks are recorded
+there; no AI frontend deployment or model invocation has been performed. Mocked guide tests run through
+the existing deployment regression gate, or directly with
+`node --test scripts/travel-guide.test.cjs`.
 
 ## Updates
 

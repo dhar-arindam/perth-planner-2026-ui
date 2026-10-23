@@ -2,7 +2,11 @@
 
 There is one environment: production. Hosting setup is manual; future application
 uploads are automated by GitHub Actions. No CDK, bootstrap, npm, build system,
-custom domain, Route 53, database, or backend is required.
+custom domain, Route 53, database, or backend is required for static hosting.
+The optional v16 AI backend has a separate approval-gated configuration runbook in
+[travel-guide.md](travel-guide.md). Do not recreate hosting or repurpose Draw
+resources to configure the guide; none of this page's hosting commands sets up its
+authentication, signing secret or Lambda API.
 
 ## Existing Foundation: Reuse, Do Not Recreate
 

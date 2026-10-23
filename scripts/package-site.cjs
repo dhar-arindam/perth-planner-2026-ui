@@ -9,6 +9,7 @@ const ROOT = path.resolve(__dirname, '..');
 const OUTPUT = path.join(ROOT, '.deployment');
 const PRODUCTION_FILES = [
   'index.html', 'styles.css', 'app.js', 'data.js', 'manifest.webmanifest', 'sw.js',
+  'guide-contract.js', 'guide-config.js', 'guide.js',
   'perth-coast.jpg', 'dm-sans.ttf', 'manrope.ttf', 'dm-sans-OFL.txt', 'manrope-OFL.txt',
   'perth-trip-planner.svg', 'perth-icon-180.png', 'perth-icon-192.png', 'perth-icon-512.png'
 ];

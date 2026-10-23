@@ -3,6 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="referrer" content="no-referrer">
     <meta name="theme-color" content="#f6f4ef">
     <meta name="background-color" content="#f6f4ef">
     <meta name="description" content="A practical, personal itinerary for a Perth work trip and confirmed flights, 10–24 October 2026.">
@@ -14,7 +15,10 @@
     <link rel="apple-touch-icon" sizes="180x180" href="perth-icon-180.png">
     <link rel="stylesheet" href="styles.css">
     <script src="data.js" defer></script>
+    <script src="guide-contract.js" defer></script>
     <script src="app.js" defer></script>
+    <script src="guide-config.js" defer></script>
+    <script src="guide.js" defer></script>
   </head>
   <body>
     <a class="skip-link" href="#today">Skip to daily briefing</a>
@@ -68,6 +72,22 @@
             <button type="button" data-add-event="custom">Custom plan</button>
           </div>
         </section>
+        <section class="travel-guide" id="travel-guide" aria-labelledby="guide-title">
+          <div class="selected-day-heading"><h3 id="guide-title">AI travel guide</h3><div class="quick-plan-actions"><button type="button" id="guide-sign-in">Sign in</button><button type="button" id="guide-sign-out" hidden>Sign out</button><button type="button" id="guide-clear">Clear chat</button></div></div>
+          <p class="guide-source-note">AI requires internet. Trip facts come from your planner. No live weather, opening hours, routes or availability are connected; recommendations need verification.</p>
+          <p id="guide-status" role="status">AI is not connected.</p>
+          <div class="guide-context">
+            <div class="guide-location-field"><label for="guide-location">Last-known location (optional)<input id="guide-location" maxlength="160" autocomplete="off" placeholder="e.g. Thomson Bay settlement" aria-describedby="guide-location-status guide-location-privacy"></label><div class="quick-plan-actions"><button type="button" id="guide-use-location" aria-describedby="guide-location-privacy">Use my location</button><button type="button" id="guide-clear-location" disabled>Clear location</button></div><p id="guide-location-status" role="status">No location selected.</p><p id="guide-location-privacy">Location is shared when you send a message or confirm AI changes. Location chats stay in memory and clear on reload. No background tracking.</p></div>
+            <label for="guide-preferences">Preferences or conditions (optional)<input id="guide-preferences" maxlength="400" autocomplete="off" placeholder="e.g. tired, no cycling, light dinner"></label>
+          </div>
+          <div id="guide-prompts" class="quick-plan-actions" aria-label="Suggested questions">
+            <button type="button" data-guide-prompt>What should I do next?</button><button type="button" data-guide-prompt>I've finished my current activity. Plan the rest of my day.</button><button type="button" data-guide-prompt>I'm tired. Suggest a relaxed alternative.</button><button type="button" data-guide-prompt>Change today's plan to avoid cycling.</button><button type="button" data-guide-prompt>Find somewhere nearby for a light dinner.</button><button type="button" data-guide-prompt>Can I fit another stop before my ferry?</button><button type="button" data-guide-prompt>What should I skip if I'm running late?</button><button type="button" data-guide-prompt>Update tomorrow's plan based on what I've completed today.</button>
+          </div>
+          <div id="guide-messages" role="log" aria-label="Travel guide conversation" aria-live="polite"></div>
+          <p id="guide-error" role="alert"></p><button type="button" class="secondary-button" id="guide-retry" hidden>Retry message</button>
+          <div id="guide-proposal" class="guide-proposal" hidden></div><p id="guide-applied" role="status"></p>
+          <form id="guide-form" class="guide-form" aria-busy="false"><label for="guide-input">Message your travel guide<textarea id="guide-input" rows="2" maxlength="1000" required></textarea></label><button type="submit" class="primary-button" id="guide-send" aria-label="Send message" title="Send message">&#8593;</button></form>
+        </section>
       </section>
 
       <section class="flights-section section-shell" id="flights" aria-labelledby="flights-title">
@@ -82,7 +102,7 @@
         <div class="section-shell weekend-inner">
           <div class="section-heading weekend-heading">
             <div><p class="eyebrow">16–18 OCTOBER / YOUR CALL</p><h2 id="weekend-title">Three ways to spend the weekend.</h2></div>
-            <p class="section-note">Nothing is selected. Preview a plan to see its matching Thursday, Friday, and weekend schedule.</p>
+            <p class="section-note">Chosen: Option 1 · Perth + Rottnest + Fremantle. No Friday leave.</p>
           </div>
           <div id="option-selector" class="option-grid"></div>
           <div id="option-detail" class="option-detail" aria-live="polite"></div>
@@ -143,6 +163,6 @@
       </form>
     </dialog>
 
-    <footer class="footer"><a class="wordmark footer-mark" href="#top"><span class="wordmark-mark">P</span><span>PERTH TRIP PLANNER</span></a><span class="planner-updated">Trip planner updated: <time datetime="2026-10-05">5 October 2026</time><br><span id="planner-version">Version v9</span><span id="offline-status" role="status">Offline setup pending</span></span><a href="#top">Back to top ↑</a></footer>
+    <footer class="footer"><a class="wordmark footer-mark" href="#top"><span class="wordmark-mark">P</span><span>PERTH TRIP PLANNER</span></a><span class="planner-updated">Trip planner updated: <time datetime="2026-10-16">16 October 2026</time><br><span id="planner-version">Version v16</span><span id="offline-status" role="status">Offline setup pending</span></span><a href="#top">Back to top ↑</a></footer>
   </body>
 </html>

@@ -51,9 +51,9 @@
   }
 
   function renderAddedEntry(event) {
-    const status = event.completed ? 'ACTUAL · COMPLETED' : 'ACTUAL · ADDED';
+    const status = event.skipped ? 'ACTUAL · SKIPPED' : event.completed ? 'ACTUAL · COMPLETED' : 'ACTUAL · ADDED';
     const doneLabel = event.completed ? 'Undo done' : 'Done';
-    const controls = `${planButton('Edit actual', 'edit-event', event.id, 'addition')}${planButton(doneLabel, 'complete-event', event.id, 'addition')}${planButton('Delete', 'delete-event', event.id, 'addition')}`;
+    const controls = event.skipped ? planButton('Restore added', 'restore-addition', event.id, 'addition') : `${planButton('Edit actual', 'edit-event', event.id, 'addition')}${planButton(doneLabel, 'complete-event', event.id, 'addition')}${planButton('Delete', 'delete-event', event.id, 'addition')}`;
     return renderPlanItem(event, status, controls, 'is-actual');
   }
 
@@ -79,9 +79,9 @@
       return;
     }
     const events = plannedEvents(date, day);
-    const rows = events.map((event) => renderPlannedEntry(event, bucket)).join('');
-    const additions = (bucket.additions || []).map(renderAddedEntry).join('');
-    $('#today-events').innerHTML = rows || additions ? `<div class="selected-event-list">${rows}${additions}</div>` : '<p class="empty-day-note">No plan is set. Add free time or a custom activity if useful.</p>';
+    const entries = events.map(event => ({ id: event.id, markup: renderPlannedEntry(event, bucket) })).concat((bucket.additions || []).map(event => ({ id: event.id, markup: renderAddedEntry(event) })));
+    const rows = window.TravelGuideContract.orderEvents(entries, bucket.order).map(entry => entry.markup).join('');
+    $('#today-events').innerHTML = rows ? `${day.schedule === 'rottnestPlan' ? renderRottnestGuide('selected') : ''}<div class="selected-event-list">${rows}</div>` : '<p class="empty-day-note">No plan is set. Add free time or a custom activity if useful.</p>';
     $('.quick-plan-actions').hidden = false;
   }
 
@@ -126,6 +126,12 @@
     const original = base.find((event) => event.id === eventId);
     const addition = (bucket.additions || []).find((event) => event.id === eventId);
     if (original?.confirmed) return;
+    if (action === 'restore-addition' && addition) {
+      addition.skipped = false;
+      saveActualPlan(date, bucket);
+      renderActualPlan();
+      return;
+    }
     if (action === 'edit-event') {
       openPlanEditor(source === 'addition' ? 'addition' : 'override', addition || bucket.overrides[eventId] && { ...original, ...bucket.overrides[eventId] } || original, eventId);
       return;
@@ -186,7 +192,27 @@
   const todayDate = `${perthDate.year}-${perthDate.month}-${perthDate.day}`;
   $('#today-date').value = todayDate < trip.trip.start ? trip.trip.start : todayDate > trip.trip.end ? trip.trip.end : todayDate;
   let activeFilter = 'all';
-  let weekendChoice = null;
+  let weekendChoice = trip.chosenWeekendOption || null;
+  let rottnestMode = 'bus';
+  try {
+    if (localStorage.getItem('perth-trip-rottnest-mode') === 'bicycle') rottnestMode = 'bicycle';
+  } catch {}
+
+  function rottnestEvents() {
+    if (rottnestMode === 'bus') return trip.rottnestPlan;
+    let inserted = false;
+    return trip.rottnestPlan.flatMap((event) => {
+      if (!event.modeStop) return [event];
+      if (inserted) return [];
+      inserted = true;
+      return trip.rottnestBicycleStops;
+    });
+  }
+
+  function renderRottnestGuide(context) {
+    const guide = trip.rottnestGuide;
+    return `<section class="rottnest-guide" aria-label="Rottnest transport and practical guide"><fieldset class="rottnest-modes" data-rottnest-controls="${context}"><legend>Island transport</legend>${[['bus', 'Option A: Bus and walking (recommended)'], ['bicycle', 'Option B: Bicycle']].map(([value, label]) => `<label><input type="radio" name="rottnest-mode-${context}" value="${value}" data-rottnest-mode ${rottnestMode === value ? 'checked' : ''}><span>${label}</span></label>`).join('')}</fieldset><p>${rottnestMode === 'bus' ? 'No bicycle hire required. Thomson Bay, quokkas and The Basin, with one or two additional stops only if the verified timetable allows.' : 'Bicycle hire optional. A full island loop takes several hours with hills and exposed sections; choose a short ride instead and allow time to return the bicycle.'}</p><h4>Island Explorer bus guide</h4><p>${esc(guide.service)}</p><p>${esc(guide.verification)}</p>${officialLink(guide.url, 'Official bus timetable and service map')}<p>${esc(guide.ferry)}</p><p>${esc(guide.preparation)}</p></section>`;
+  }
 
   function briefingContext() {
     const selectedDate = currentDate();
@@ -290,33 +316,11 @@
   }
 
   function dayEvents(day, choice = weekendChoice) {
-    const flightEvents = flightTimelineEvents(day.date);
-    if (day.events === 'flights') return flightEvents;
-    if (day.events === 'arrival') return [...flightEvents, ...trip.arrival];
-    const events = Array.isArray(day.events) ? [...day.events].map((event) => {
-      const flight = event.flightRef && trip.flights.find((segment) => segment.id === event.flightRef);
-      return flight ? { ...event, title: `Late-night Uber to ${flight.origin.name} for ${flight.flightNumber} at ${flight.departureTime}` } : event;
-    }) : [];
-    if (day.schedule && Array.isArray(trip[day.schedule])) events.push(...trip[day.schedule]);
-    if (isWorkday(day, choice)) {
-      events.unshift({ time: trip.work.hours, title: trip.work.name, type: 'work', transport: 'Walk', query: trip.work.query, note: 'Woodside workday.' });
-      if (!Array.isArray(day.events) && !day.schedule) {
-        events.push({ time: day.activityTime || 'After work', title: day.kind === 'departure' ? 'Uber to Perth Airport' : 'After-work plan', type: day.kind === 'departure' ? 'travel' : 'activity', note: day.activity, transport: day.transport, query: day.kind === 'departure' ? 'Perth Airport, Western Australia' : day.location ? trip.locations[day.location]?.query : null });
-      }
-    }
-    if (events.length) return [...flightEvents, ...events];
-    return [{
-      time: day.activityTime || (day.date === '2026-10-16' ? 'Plan-dependent' : 'Today'),
-      title: day.title,
-      note: day.activity,
-      type: day.activityType || (day.kind === 'departure' ? 'travel' : 'activity'),
-      transport: day.transport,
-      query: day.kind === 'departure' ? 'Perth Airport, Western Australia' : day.location ? trip.locations[day.location]?.query : null
-    }];
+    return window.TravelGuideContract.plannedTripDay(trip, day.date, choice, rottnestMode).events;
   }
 
   function plannedEvents(date, day = dayFor(date), choice = weekendChoice) {
-    return dayEvents(day, choice).map((event, index) => ({ ...event, id: `${date}-planned-${index}`, source: 'planned' }));
+    return dayEvents(day, choice).map((event, index) => ({ ...event, id: `${date}-${event.id || `planned-${index}`}`, source: 'planned' }));
   }
 
   const actualPlanStorageKey = 'perth-trip-actual-plans';
@@ -334,7 +338,7 @@
   function actualBucket(date, choice = weekendChoice) {
     const plans = readActualPlans();
     const bucket = plans[`${date}|${choice || 'none'}`] || {};
-    return { overrides: bucket.overrides || {}, additions: Array.isArray(bucket.additions) ? bucket.additions : [] };
+    return { overrides: bucket.overrides || {}, additions: Array.isArray(bucket.additions) ? bucket.additions : [], ...(Array.isArray(bucket.order) ? { order: bucket.order } : {}) };
   }
 
   function effectiveEvents(date, day = dayFor(date), choice = weekendChoice) {
@@ -345,8 +349,81 @@
       if (override?.skipped) return [];
       return [override ? { ...event, ...override, id: event.id, source: 'actual' } : event];
     });
-    return [...baseline, ...bucket.additions.map((event) => ({ ...event, source: 'actual-addition' }))];
+    return window.TravelGuideContract.orderEvents([...baseline, ...bucket.additions.filter(event => !event.skipped).map((event) => ({ ...event, source: 'actual-addition' }))], bucket.order);
   }
+
+  function guideSnapshot({ location = null, preferences = '' } = {}) {
+    const days = trip.days.map(({ date }) => {
+      const day = dayFor(date);
+      const bucket = actualBucket(date);
+      const events = plannedEvents(date, day).map(event => {
+        const override = event.confirmed ? null : bucket.overrides[event.id];
+        return { ...event, ...override, locked: window.TravelGuideContract.locked(event), source: override ? 'actual' : 'planned' };
+      }).concat(bucket.additions.map(event => ({ ...event, source: 'actual-addition' })));
+      return {
+        date, title: day.title, destination: day.destination || day.base,
+        hotel: day.kind === 'flight' ? null : trip.hotels[date < '2026-10-16' ? 0 : 1],
+        events: window.TravelGuideContract.orderEvents(events, bucket.order).map(event => {
+          const segment = event.type === 'flight' && trip.flights.find(flight => event.title.startsWith(`${flight.id} departure`) || event.title.startsWith(`${flight.id} arrival`));
+          const arrival = segment && event.title.startsWith(`${segment.id} arrival`);
+          const airport = segment && (arrival ? segment.destination : segment.origin);
+          const flightTime = segment && (arrival ? segment.arrivalTime : segment.departureTime);
+          return {
+            id: event.id, title: event.title, time: event.time || 'Flexible', type: event.type || 'activity',
+            transport: event.transport || '', note: event.note || '', source: event.source,
+            status: event.skipped ? 'skipped' : event.completed ? 'completed' : 'pending',
+            locked: window.TravelGuideContract.locked(event),
+            ...(flightTime ? { startAt: `${arrival ? segment.arrivalDate : segment.date}T${flightTime}:00${airport.code === 'BLR' ? '+05:30' : '+08:00'}` } : {})
+          };
+        })
+      };
+    });
+    return { version: 1, now: new Date().toISOString(), timezone: trip.trip.timezone, selectedDate: currentDate(), option: weekendChoice || trip.chosenWeekendOption, rottnestMode, days, location, preferences };
+  }
+
+  const consumedGuideApprovals = new Set();
+  async function applyGuideChanges(changes, context, authorization) {
+    if (!authorization?.receipt || !authorization.sessionId || !authorization.parentId) throw Error('Server confirmation is required for AI changes.');
+    const getContext = typeof context === 'function' ? context : () => context;
+    const snapshot = guideSnapshot(getContext());
+    const proof = await window.TravelGuideContract.verifyAuthorization(authorization.receipt, { kind: 'apply', snapshot, changes, trip, sessionId: authorization.sessionId, parentId: authorization.parentId, publicKey: window.TRAVEL_GUIDE_CONFIG.proposalPublicKey });
+    if (consumedGuideApprovals.has(proof.parentId)) throw Error('This proposal was already applied in this page.');
+    if (window.TravelGuideContract.contextRevision(snapshot) !== window.TravelGuideContract.contextRevision(guideSnapshot(getContext()))) throw Error('Your itinerary changed during confirmation.');
+    const buckets = Object.fromEntries(snapshot.days.map(day => [day.date, actualBucket(day.date)]));
+    const result = window.TravelGuideContract.applyChanges(snapshot, changes, buckets, () => `actual-${crypto.randomUUID()}`);
+    const allPlans = readActualPlans();
+    for (const date of new Set(changes.filter(change => change.action !== 'set_transport').map(change => change.date))) allPlans[`${date}|${weekendChoice || 'none'}`] = result.buckets[date];
+    const writes = [{ key: actualPlanStorageKey, value: JSON.stringify(allPlans) }];
+    if (result.rottnestMode !== rottnestMode) writes.push({ key: 'perth-trip-rottnest-mode', value: result.rottnestMode });
+    const previousValues = writes.map(write => localStorage.getItem(write.key));
+    let saved = 0;
+    try {
+      for (const write of writes) {
+        localStorage.setItem(write.key, write.value);
+        saved++;
+      }
+    } catch {
+      let rollbackFailed = false;
+      for (let index = saved - 1; index >= 0; index--) {
+        try {
+          if (previousValues[index] === null) localStorage.removeItem(writes[index].key);
+          else localStorage.setItem(writes[index].key, previousValues[index]);
+        } catch { rollbackFailed = true; }
+      }
+      if (rollbackFailed) {
+        renderActualPlan();
+        throw Error('Storage failed and could not restore all prior values. Review your actual plan before retrying.');
+      }
+      throw Error('Unable to save changes. Your previous plan has been restored.');
+    }
+    rottnestMode = result.rottnestMode;
+    consumedGuideApprovals.add(proof.parentId);
+    renderOptions();
+    renderActualPlan();
+    filterDays();
+  }
+
+  window.PerthPlannerGuide = { snapshot: guideSnapshot, apply: applyGuideChanges };
 
   function optionDays(option) {
     return option.dates.map((date) => ({ date, ...dayFor(date, option.id) }));
@@ -428,6 +505,8 @@
 
   function renderOptions() {
     $('#option-selector').innerHTML = trip.options.map((option) => `<article class="option-card ${weekendChoice === option.id ? 'is-current' : ''}"><div class="option-topline"><span>${option.number} / WEEKEND PLAN</span><span class="leave-pill">${esc(option.leave)}</span></div><h3>${esc(option.title)}</h3><p class="option-subtitle">${esc(option.subtitle)}</p><div class="option-facts"><div><span>KEY DESTINATIONS</span><strong>${esc(optionDestinations(option))}</strong></div><div><span>EFFORT</span><strong>${esc(option.effort)}</strong></div><div><span>MAIN HIGHLIGHT</span><p>${esc(option.highlight)}</p></div><div><span>DEPENDENCY</span><p>${esc(option.dependency)}</p></div></div><button class="option-button" type="button" data-option="${option.id}" aria-pressed="${weekendChoice === option.id}">${weekendChoice === option.id ? 'Previewing this plan' : 'Preview this plan'} <span aria-hidden="true">→</span></button></article>`).join('');
+    const chosenButton = $(`#option-selector [data-option="${trip.chosenWeekendOption}"]`);
+    if (chosenButton) chosenButton.innerHTML = 'Chosen option <span aria-hidden="true">&#10003;</span>';
     const detail = $('#option-detail');
     if (!weekendChoice) {
       detail.innerHTML = '<div class="option-empty"><span class="eyebrow">NO PLAN PREVIEWED</span><p>Choose any option above to see the day-by-day version. Your choice is only held until you close or refresh this page.</p></div>';
@@ -438,6 +517,12 @@
     const showReminder = weekendChoice !== 'option1';
     const schedule = optionDays(option);
     detail.innerHTML = `<div class="option-plan-head"><div><p class="eyebrow">PREVIEW / ${option.number}</p><h3>${esc(option.title)}</h3></div><button class="clear-choice" type="button" id="clear-choice">Clear preview</button></div><div class="option-plan-days">${schedule.map((day) => `<article><span class="eyebrow">${dateParts(day.date).shortDay} ${dateParts(day.date).shortDate}</span><h4>${esc(day.title)}</h4><p>${esc(day.activity)}</p></article>`).join('')}</div>${showReminder ? `<div class="luggage-alert"><span aria-hidden="true">!</span><strong>${esc(trip.southwest.reminder)}</strong></div>` : ''}${weekendChoice === 'option2' ? '<div class="option-detail-note">Monday 19 October: work normally.</div>' : weekendChoice === 'option3' ? '<div class="option-detail-note">Monday 19 October: work normally. Swan Valley tour: select an operator later; no tour is preselected.</div>' : ''}`;
+    if (weekendChoice === trip.chosenWeekendOption) {
+      $('.option-plan-head .eyebrow', detail).textContent = `CHOSEN OPTION / ${option.number}`;
+      $('#clear-choice').hidden = true;
+    } else if (trip.chosenWeekendOption) {
+      $('#clear-choice').textContent = 'Return to chosen option';
+    }
     renderWeekendDays();
   }
 
@@ -459,7 +544,7 @@
   function renderRottnestCard(dateLabel) {
     const jetty = trip.locations.jetty;
     const island = trip.locations.rottnest;
-    return `<article class="plan-detail-card"><p class="eyebrow">${esc(dateLabel)}</p><h3>Rottnest Island</h3><p>Quokkas, beaches, walking or cycling. No car needed.</p><p class="address-line">Barrack Street Jetty: ${esc(jetty.address)}<br>Rottnest Island: ${esc(island.address)}</p>${miniTimeline(trip.rottnestPlan)}<div class="action-links">${officialLink(island.url, 'Rottnest official site')}${officialLink(trip.official.ferry, 'Ferry operator')}${mapsLink(jetty.query, 'Barrack Street Jetty map')}${mapsLink(island.query, 'Navigate to Rottnest')}</div></article>`;
+    return `<article class="plan-detail-card"><p class="eyebrow">${esc(dateLabel)}</p><h3>Rottnest Island</h3><p>Quokkas, beaches and an unhurried island day. No car needed.</p><p class="address-line">Suggested Perth departure: Barrack Street Jetty, ${esc(jetty.address)}. Check your booking.<br>Rottnest Island: ${esc(island.address)}</p>${renderRottnestGuide('weekend')}${miniTimeline(rottnestEvents())}<div class="action-links">${officialLink(island.url, 'Rottnest official site')}${officialLink(trip.official.ferry, 'Ferry operator')}${mapsLink(jetty.query, 'Barrack Street Jetty map')}${mapsLink(island.query, 'Navigate to Rottnest')}</div></article>`;
   }
 
   function renderTours() {
@@ -527,6 +612,17 @@
   filterDays();
 
   $('#today-date').addEventListener('change', () => { renderTodaySummary(); renderSelectedDay(); });
+  document.addEventListener('change', (event) => {
+    const control = event.target.closest('[data-rottnest-mode]');
+    if (!control || !['bus', 'bicycle'].includes(control.value)) return;
+    const context = control.closest('[data-rottnest-controls]').dataset.rottnestControls;
+    rottnestMode = control.value;
+    try { localStorage.setItem('perth-trip-rottnest-mode', rottnestMode); } catch {}
+    renderOptions();
+    renderActualPlan();
+    filterDays();
+    $(`[data-rottnest-controls="${context}"] input[value="${rottnestMode}"]`)?.focus({ preventScroll: true });
+  });
   $('.filter-wrap').addEventListener('click', (event) => {
     const button = event.target.closest('[data-filter]');
     if (button) setFilter(button.dataset.filter);
@@ -544,7 +640,7 @@
   });
   $('#option-detail').addEventListener('click', (event) => {
     if (event.target.closest('#clear-choice')) {
-      weekendChoice = null;
+      weekendChoice = trip.chosenWeekendOption || null;
       activeFilter = 'all';
       $$('.filter-button').forEach((item) => { item.classList.toggle('is-active', item.dataset.filter === 'all'); item.setAttribute('aria-pressed', String(item.dataset.filter === 'all')); });
       renderOptions();

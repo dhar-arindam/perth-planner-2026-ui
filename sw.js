@@ -1,10 +1,13 @@
-const CACHE_NAME = 'perth-trip-planner-v9';
+const CACHE_NAME = 'perth-trip-planner-v16';
 const APP_SHELL = [
   './',
   './index.html',
   './styles.css',
   './data.js',
   './app.js',
+  './guide-contract.js',
+  './guide-config.js',
+  './guide.js',
   './manifest.webmanifest',
   './perth-trip-planner.svg',
   './perth-icon-180.png',

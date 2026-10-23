@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const { EventEmitter } = require('node:events');
+const { execFileSync } = require('node:child_process');
 const { test } = require('node:test');
 const { PRODUCTION_FILES, OUTPUT, checkReferences, packageSite } = require('./package-site.cjs');
 const { verifyDeployment } = require('./verify-deployment.cjs');
@@ -49,7 +50,7 @@ test('only the target CloudFront distribution receives bucket read access', () =
 test('production allowlist includes all referenced assets and excludes development files', () => {
   checkReferences();
   assert.equal(new Set(PRODUCTION_FILES).size, PRODUCTION_FILES.length);
-  for (const file of PRODUCTION_FILES) assert.doesNotMatch(file, /^(infra|deployment|scripts|\.git|README|node_modules)/);
+  for (const file of PRODUCTION_FILES) assert.doesNotMatch(file, /^(infra|deployment|backend|docs|scripts|\.git|README|node_modules)/);
   assert.ok(PRODUCTION_FILES.includes('dm-sans-OFL.txt') && PRODUCTION_FILES.includes('manrope-OFL.txt'));
 });
 
@@ -112,4 +113,30 @@ test('release verification checks actual content and rejects stale assets', asyn
   await verifyDeployment();
   stale = true;
   await assert.rejects(verifyDeployment(), /Stale or corrupted file: app.js/);
+});
+
+test('Travel Guide ships only public assets and passes mocked backend/contract checks', () => {
+  for (const file of PRODUCTION_FILES.filter(name => /\.(js|html|webmanifest)$/.test(name))) {
+    const source = fs.readFileSync(path.join(root, file), 'utf8');
+    assert.doesNotMatch(source, /@aws-sdk|AWS_SECRET_ACCESS_KEY|AWS_ACCESS_KEY_ID|AWS_SESSION_TOKEN|AWS4-HMAC-SHA256|PROPOSAL_SIGNING_PRIVATE_KEY|PROPOSAL_SIGNING_SECRET_ARN|SecretString|(?:AKIA|ASIA)[A-Z0-9]{16}|-----BEGIN (?:EC |RSA )?PRIVATE KEY-----/, `Privileged AWS SDK or credentials in public asset: ${file}`);
+  }
+  for (const file of ['guide-contract.js', 'guide-config.js', 'guide.js']) {
+    assert.ok(PRODUCTION_FILES.includes(file));
+    const source = fs.readFileSync(path.join(root, file), 'utf8');
+    assert.doesNotMatch(source, /@aws-sdk|AWS_SECRET_ACCESS_KEY|AWS_ACCESS_KEY_ID|AKIA[A-Z0-9]{16}|BEDROCK_MODEL_ID/);
+  }
+  const config = {};
+  vm.runInNewContext(fs.readFileSync(path.join(root, 'guide-config.js'), 'utf8'), { window: config });
+  assert.deepEqual(Object.keys(config.TRAVEL_GUIDE_CONFIG).sort(), ['apiUrl', 'clientId', 'oauthDomain', 'proposalPublicKey', 'redirectUri', 'scope']);
+  if (config.TRAVEL_GUIDE_CONFIG.proposalPublicKey !== null) {
+    assert.deepEqual(Object.keys(config.TRAVEL_GUIDE_CONFIG.proposalPublicKey).sort(), ['crv', 'kty', 'x', 'y']);
+    assert.equal(config.TRAVEL_GUIDE_CONFIG.proposalPublicKey.kty, 'EC');
+    assert.equal(config.TRAVEL_GUIDE_CONFIG.proposalPublicKey.crv, 'P-256');
+  }
+  assert.ok(config.TRAVEL_GUIDE_CONFIG.apiUrl === '' || new URL(config.TRAVEL_GUIDE_CONFIG.apiUrl).protocol === 'https:', 'Guide must be disabled or use an HTTPS endpoint');
+  const environment = { ...process.env };
+  delete environment.NODE_TEST_CONTEXT;
+  const output = execFileSync(process.execPath, ['--test', path.join(__dirname, 'travel-guide.test.cjs')], { encoding: 'utf8', env: environment });
+  assert.match(output, /snapshot retains recorded status/);
+  assert.match(output, /rescheduling reorders actual events/);
 });
